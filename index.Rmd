@@ -1,327 +1,223 @@
 ---
-title: "Atividade-5"
+title: "Reconstrução Filogenética"
 author: "Luciana Botacim"
-date: "2025-05-16"
+date: "2025-06-03"
 output: html_document
+tabset: true
 ---
 
+## {.tabset}
+
+### Estudo
+
+Utilizaremos dados provenientes de um banco de dados para a reconstrução da filogenia das espécies em estudo. A análise filogenética é um passo fundamental para a avaliação de padrões de estrutura filogenética, permitindo a investigação de processos ecológicos e evolutivos subjacentes à composição das comunidades.
+
+
+<h1 style="font-size: 32px; text-align: center;">Base de dados utilizada</h1>
+
+Os dados que utilizaremos foram obtidos no **Repositório de Dados de Estudos Ecológicos CENBAM/PPBio**, vinculado à plataforma **DataONE**.
+
+![](dataON.png)
+
+O estudo selecionado é:
+
+> **Flávia RC Costa. _Composição da Comunidade de Ervas Terrestres da Reserva Ducke_. Programa de Pesquisa em Biodiversidade (PPBio).**
+
+Este conjunto de dados reúne informações sobre a composição de ervas terrestres na **Reserva Florestal Adolpho Ducke**, na Amazônia Central. Ele será nosso modelo pois contém:
+
+- Lista de espécies por unidade amostral
+Além de:
+- Matriz de composição da comunidade
+- Metadados
+
+---
+
+
+### Dados
+
+1. Site do repositório:  
+   👉 [https://ppbio.inpa.gov.br/repositorio/dados](https://ppbio.inpa.gov.br/repositorio/dados)
+
+2. Clique no botão:  
+   **"CLIQUE AQUI PARA ACESSAR OS METADADOS E DADOS PPBIO"**
+
+3. Na página de busca, digite:  
+   - Título: **Composição da Comunidade de Ervas Terrestres da Reserva Ducke**  
+   
+O que encontrará:
+
+- **Metadados**: informações descritivas sobre o conjunto de dados, como local de coleta, método amostral, período do estudo, responsáveis, unidades de medida etc.
+- **Lista de espécies**: todas as ervas registradas em campo organizadas por parcela
+- **Matriz de composição**: abundância de espécies em cada unidade amostral
+
+> 🔹 O passo a passo mencionado anteriormente tem apenas caráter informativo. As matrizes serão fornecidas nas etapas seguintes.
+
+---
+
+### Correção Taxonômica
+
+<h1 style="font-size: 32px; text-align: center;">Prática 1: Correção taxonômica</h1>
+
+**Correção taxonômica baseada no projeto REFLORA**
+
+A correção taxonômica consiste na padronização e verificação dos nomes científicos das espécies com base em fontes atualizadas. 
+
+O REFLORA, em parceria com o Jardim Botânico do Rio de Janeiro, oferece acesso à Lista de Espécies da Flora do Brasil, que é amplamente utilizada como referência oficial para estudos botânicos e ecológicos no país. A plataforma permite verificar sinônimos, nomes válidos e a classificação taxonômica mais recente, assegurando maior precisão na identificação e análise das espécies.
+<https://floradobrasil.jbrj.gov.br/reflora/listaBrasil/PrincipalUC/PrincipalUC.do>
+
+![](Reflora.png)
+
+Agora vamos aplicar essa correção à **lista de espécies** do banco de dados mencionado anteriormente. O arquivo contém os nomes científicos, os gêneros e as famílias em formato `.csv`.
+
+
+**Carregue a matriz de espécies**
+
 ```{r}
-gc()
+especie = read.csv(file="species_gen_fam.csv", sep = ";")	
+
+head(especie)	
+```
+
+**Identifica a estrutura do objeto**
+```{r}
+str(especie)
+```
+
+Indica se é ou não uma tabela de dados (data.frame), número de observações nas linhas e variáveis nas colunas. 
+
+**Torna as colunas de um data.frame acessíveis diretamente pelo nome**
+```{r}
+attach(especie) 
+```
+
+**Identificar se é caracter** 
+```{r}
+class(scientificname)
+as.character(scientificname)
+```
+
+Utilizaremos a função `get.taxa()` do pacote `flora` para corrigir e padronizar os nomes taxonômicos da nossa lista de espécies.
+
+**Instalar o pacote FLORA** <https://cran.r-project.org/web/packages/flora/index.html>
+
+`install.packages(flora)`
+```{r}
+library(flora)
+```
+
+**O pacote flora faz essa correção:**
+
+- A função `get.taxa()` busca os nomes científicos fornecidos na **Lista de Espécies da Flora do Brasil**, por meio da base oficial do projeto **REFLORA**.
+
+- Corrige **sinônimos e nomes inválidos**, retornando os **nomes aceitos** segundo a classificação atual.
+
+- O argumento `as.character(scientificname)` converte o vetor ou coluna `scientificname` para o formato texto, garantindo que os nomes sejam interpretados corretamente pela função.
+
+- O parâmetro `life.form = TRUE` indica que **será retornada** a informação sobre a forma de vida das espécies (como erva, arbusto, árvore etc).
+
+- Se esse argumento fosse `life.form = FALSE`, o resultado não incluiria essas informações adicionais.
+
+```{r}
+names = get.taxa(as.character(scientificname), life.form = T)
+head(names)
+```
+
+A função `get.taxa()` do pacote `flora` retorna um data frame com colunas como: `id`, `scientific.name`, `accepted.name`, `family`, `taxon.rank`, `taxon.status`, `search.str`, `threat.status`, `notes`, `original.search` e `life.form`.
+
+**Salvar a matriz de correção**
+```{r}
+write.table(names, file = "flora_gen_fam.csv", sep = ";")
+```
+
+### Filogenia
+
+<h1 style="font-size: 32px; text-align: center;">Prática 2: Reconstrução Filogenética</h1>
+
+
+
+---
+
+**Organização da matriz de espécies (fora do R**)
+
+Antes de importar os dados para o R, precisamos organizar a **matriz de espécies** corretamente:
+
+- O pacote `V.PhyloMaker` só reconhece nomes científicos **com gênero e epíteto separados por um underline** (`_`).
+  
+  ✅ Exemplo de formato correto: `Copaifera_langsdorffii`
+
+- Edite a lista de espécies, no Excel, e garanta que todos os nomes estejam nesse formato, **sem autores, acentos ou abreviações**. 
+
+- Salve o arquivo no formato `.csv`.
+ 
+
+
+Para a reconstrução filogenética, utiliza-se a coluna `accepted.name` da lista que corrigimos anteriormente, além de colunas separadas para `gênero` e `família`. É recomendável também incluir duas colunas em branco, com os títulos `genus.GBOTB` e `spp.GBOTB`.
+
+
+**Instalar o pacote V.PhyloMaker2**
+
+O pacote `V.PhyloMaker2` não está disponível no CRAN, por isso precisamos instalá-lo diretamente a partir do GitHub. Para isso, utilizamos a função `install_github()` do pacote `devtools`.
+
+
+`install.packages(devtools)`
+
+`library("devtools")`
+
+`devtools::install_github("jinyizju/V.PhyloMaker2")`
+
+Outros pacotes também serão necessários para ler e salvar a filogenia. 
+
+`install.packages(picante)`
+
+`install.packages(phytools)`
+
+```{r}
+library(V.PhyloMaker2)
+library(picante)
+library(phytools)
+```
+
+**Carregar a matriz para, em seguida, reconsrtuir a filogenia.**
+```{r}
+phylo  <-  read.csv("lista_phylo.csv", sep = ";")
+head(phylo)
+```
+
+```{r}
+tree <- phylo.maker(sp.list = phylo,  tree = GBOTB.extended.TPL,  
+                      nodes = nodes.info.1.TPL, scenarios="S3")
 ```
 
 
-
+**Salvar a árvore reconstruída no formato .tre**
 ```{r}
-library(rgbif)
-library(tidyverse)
+write.tree(tree$scenario.3, "phylo_tree.tre")
 ```
 
-
-
-# baixar ocorrencias
+**Carregar a visualizar a árvore**
 ```{r}
-tub_gbif <- occ_data(scientificName = "Carcharhinus longimanus", 
-                     hasCoordinate = TRUE,
-                     hasGeospatialIssue=FALSE)
-```
-
-
-
-# dimensoes
-```{r}
-dim(tub_gbif)
-dim(tub_gbif$data)
-```
-
-
-# checar campos
-```{r}
-tub_gbif$data %>% names
-tub_gbif$data$municipality
-tub_gbif$data$locationID
-
-gbif_issues()
-```
-
-
-# checar problemas reportados
-```{r}
-tub_issues_gbif <- tub_gbif$data$issues %>% 
-  unique() %>% 
-  strsplit(., "[,]") %>% 
-  unlist()
-
-gbif_issues() %>% 
-  data.frame() %>% 
-  filter(code %in% tub_issues_gbif)
-```
-
-
-#variáveis que serão úteis para a validação dos dados e futuras análises
-```{r}
-library(dplyr)
-tub_gbif1 <- tub_gbif$data %>%
-  dplyr::select(scientificName,acceptedScientificName,decimalLatitude,decimalLongitude, waterBody, depth, issues,basisOfRecord, occurrenceStatus, rightsHolder,datasetName, recordedBy,locality, habitat)
-```
-
-
-#foram encontrados 500 ocorrencias
-```{r}
-tub_gbif1 <- tub_gbif1 %>% 
-  distinct() 
-```
-
-
-Agora foi para 435
-
-# checar niveis dos fatores
-```{r}
-lapply(tub_gbif1, unique)
+plot_tree <- read.tree("phylo_tree.tre")
+plot_tree
 ```
 
 ```{r}
-library(bdc)
-library(CoordinateCleaner)
+plot_tree$tip.label
+class(plot_tree)
 ```
 
+`class` retorna a classe do objeto. 
 
-# checar coordenadas válidas
+**Salvar a árvore reconstruída no formato .jpg**
 ```{r}
-check_pf <- 
-  bdc::bdc_coordinates_outOfRange(
-    data = tub_gbif1,
-    lat = "decimalLatitude",
-    lon = "decimalLongitude")
+jpeg("plot_tree.jpg", width=16, height=16, unit="cm", res=300)
 ```
 
-
-# checar coordenadas válidas e próximas a capitais (muitas vezes as coordenadas são erroneamente associadas a capitais dos países)
-
+**Visualizar a árvore adicionando a escala**
 ```{r}
-cl <- tub_gbif1 %>%
-  CoordinateCleaner::clean_coordinates(species = "acceptedScientificName",
-                                       lat = "decimalLatitude",
-                                       lon = "decimalLongitude",
-                                       tests = c("capitals", 
-                                                 "centroids","equal", 
-                                                 "gbif", "institutions", 
-                                                 "outliers", "seas", 
-                                                 "zeros"))  
+plotTree(plot_tree, fsize=0.4, type="phylogram", lwd=1)
+add.scale.bar(cex = 1, font = 1, col = "red")
 ```
 
-
-# verificar coordenadas com flags
-
-# capitais (padrão é um raio de 10km)
-```{r}
-library(ggplot2)
-ggplot() +
-  borders("world", fill = "lightgray") +
-  geom_point(data = cl, aes(x = decimalLongitude, y = decimalLatitude, color = `.cap`)) +
-  coord_quickmap() +
-  theme_classic()
-```
-
-
-# pontos no mar
-```{r}
-ggplot() +
-  borders("world", fill = "lightgray") +
-  geom_point(data = cl, aes(x = decimalLongitude, y = decimalLatitude, color = `.sea`)) +
-  coord_quickmap() +
-  theme_classic()
-```
-
-
-# investigar niveis suspeitos
-```{r}
-tub_gbif1 %>% 
-  distinct(waterBody) %>% 
-  pull()
-```
-
-
-# varios
-
-# waterBody
-```{r}
-tub_gbif1 %>%
-  group_by(waterBody) %>% 
-  summarise(occ = length(scientificName)) %>% 
-  ggplot(aes(occ, y=waterBody)) +
-  geom_bar(stat = 'identity') 
-
-tub_gbif1 %>% 
-  filter(waterBody %in% c("Global","Pacific Ocean","Mar Caribe")) %>% 
-  distinct(datasetName)
-
-tub_gbif1 <- tub_gbif1 %>% 
-  filter(!waterBody %in% c("Global","Pacific Ocean","Mar Caribe"))
-
-tub_gbif1 %>% 
-  filter(datasetName %in% c("Observatoire Pelagis aerial surveys 2002-2021","Diveboard - Scuba diving citizen science ")) %>% 
-  data.frame()
-```
-
-
-# filtrar todas do dataset suspeito
-```{r}
-tub_gbif_noDiveboard <- tub_gbif1 %>% 
-  filter(!datasetName %in% c("Observatoire Pelagis aerial surveys 2002-2021","Diveboard - Scuba diving citizen science "))
-tub_gbif_ok<-tub_gbif_noDiveboard
-
-library(ggmap)
-library(maps)
-library(mapdata)
-
-world <- map_data("world")
-```
-
-
-# checar pontos
-```{r}
-ggplot() +
-  geom_polygon(data = world, aes(x = long, y = lat, group = group)) +
-  coord_fixed() +
-  theme_classic() +
-  geom_point(data = tub_gbif_ok, aes(x = decimalLongitude, y = decimalLatitude), color = "red") +
-  labs(x = "longitude", y = "latitude", title = expression(italic("Carcharhinus longimanus")))
-```
-
-# lims(x = c(-100, 0), y = c(-50, 25))
-
-# checar profundidade
-```{r}
-tub_gbif_ok %>% 
-  ggplot(aes(x = depth, fill = waterBody)) +
-  geom_histogram() 
-```
-
-
-
-## OBIS
-```{r}
-tub_obis <- robis::occurrence("Carcharhinus longimanus")
-```
-
-# checar dados
-```{r}
-names(tub_obis)
-
-tub_obis1 <- tub_obis %>% 
-  dplyr::select(scientificName, decimalLatitude, decimalLongitude, bathymetry,
-                flags, waterBody, basisOfRecord, occurrenceStatus, datasetName, recordedBy, depth, locality, habitat) %>% 
-  distinct()
-```
-
-
-# check problemas reportados (flags)
-```{r}
-tub_obis1 %>% 
-  distinct(flags)
-```
-
-
-# check NA em datasetName
-```{r}
-tub_obis1 %>% 
-  filter(!flags %in% c("NO_DEPTH,ON_LAND", "ON_LAND", "DEPTH_EXCEEDS_BATH,ON_LAND"),
-         is.na(datasetName)) %>% 
-  distinct(waterBody)
-```
-
-
-# depth ok
-```{r}
-tub_obis1 %>% 
-  filter(!flags %in% c("NO_DEPTH,ON_LAND", "ON_LAND", "DEPTH_EXCEEDS_BATH,ON_LAND"),
-         !is.na(datasetName),
-         !waterBody %in% c("Mar Caribe", "Pacific")) %>% 
-  ggplot(aes(x = depth, fill = waterBody)) +
-  geom_histogram() 
-
-tub_obis1 %>% 
-  filter(!flags %in% c("NO_DEPTH,ON_LAND", "ON_LAND", "DEPTH_EXCEEDS_BATH,ON_LAND"),
-         !is.na(datasetName),
-         !waterBody %in% c("Mar Caribe", "Pacific")) %>% 
-  lapply(., unique)
-
-```
-
-
-
-# aplicar filtros
-```{r}
-tub_obis_ok <- tub_obis1 %>% 
-  filter(!flags %in% c("NO_DEPTH,ON_LAND", "ON_LAND", "DEPTH_EXCEEDS_BATH,ON_LAND"),
-         !is.na(datasetName),
-         !waterBody %in% c("Mar Caribe", "Pacific"))
-```
-
-
-
-# plot
-```{r}
-ggplot() +
-  geom_polygon(data = world, aes(x = long, y = lat, group = group)) +
-  coord_fixed() +
-  theme_classic() +
-  geom_point(data = tub_obis_ok, aes(x = decimalLongitude, y = decimalLatitude, color = waterBody)) +
-  labs(x = "longitude", y = "latitude", title = expression(italic("Carcharhinus longimanus")))
-
-tub_obis_final <- tub_obis_ok %>% 
-  filter(decimalLongitude > 0 | decimalLongitude < -100)
-```
-
-
-
-# plot
-```{r}
-ggplot() +
-  geom_polygon(data = world, aes(x = long, y = lat, group = group)) +
-  coord_fixed() +
-  theme_classic() +
-  geom_point(data = tub_obis_final, aes(x = decimalLongitude, y = decimalLatitude, color = waterBody)) +
-  labs(x = "longitude", y = "latitude", title = expression(italic("Carcharhinus longimanus")))
-
-setdiff(names(tub_gbif_ok), names(tub_obis_ok))
-setdiff(names(tub_obis_final), names(tub_obis_final))
-```
-
-
-```{r}
-
-all_data <- bind_rows(tub_gbif_ok %>% 
-                        mutate(repo = paste0("gbif", row.names(.))), 
-                      tub_obis_final %>% 
-                        mutate(repo = paste0("obis", row.names(.)))) %>%
-  column_to_rownames("repo") %>% 
-  dplyr::select(decimalLongitude, decimalLatitude, depth) %>% 
-  distinct() %>% 
-  rownames_to_column("occ") %>% 
-  separate(col = "occ", into = c("datasetName", "rn"), sep = 4) %>%
-  mutate(scientificName = "Carcharhinus longimanus") %>% 
-  dplyr::select(-rn)
-
-```
-
-
-
-# mapear ocorrencias
-```{r}
-ggplot() +
-  geom_polygon(data = world, aes(x = long, y = lat, group = group)) +
-  coord_fixed() +
-  theme_classic() +
-  geom_point(data = all_data, aes(x = decimalLongitude, y = decimalLatitude, color = datasetName)) +
-  #theme(legend.title = element_blank()) +
-  labs(x = "longitude", y = "latitude", title = expression(italic("Carcharhinus longimanus")))
-
-```
-
-
-```{r}
-write.csv(all_data, "occ_GBIF-OBIS_tub_long.csv", row.names = FALSE)
-```
+A **escala** representa unidades arbitrárias de distância filogenética, baseadas no número de mudanças evolutivas. 
 
 
